@@ -1,7 +1,7 @@
 {
   "name": "environment-scripts",
   "version": "1.0.0",
-  "description": "Set up environment o help automate work process",
+  "description": "Set up environment to help automate work process",
   "main": "index.js",
   "scripts": {
     "start": "node scripts/start.js"
