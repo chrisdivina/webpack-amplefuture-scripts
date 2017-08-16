@@ -1,1 +1,1 @@
-# webpack-environment-scripts
+# webpack-amplefuture-scripts
