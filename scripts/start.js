@@ -6,6 +6,7 @@ const chalk = require('chalk')
 const figlet = require('figlet');
 const fs = require('fs');
 const util = require('util')
+const client = require('scp2')
 const paths = require('../config/paths');
 
 // Constants that we will use later in the file
@@ -13,55 +14,71 @@ const TITLE = 'Amplefuture'
 const DEVELOPMENT = 'development'
 const PRODUCTION = 'production'
 
-const sftpConfigFile = paths.resolve('./config/sftp.js');
+const projectConfigFile = paths.resolve('./config/project.js');
 
 // Set the answers to the questions
 const DEV_ENV = 'Development ' + chalk.grey('(watch changes, faster, no minification)')
 const PROD_ENV = 'Production ' + chalk.grey('(one build, slower)')
 
 
-const sftpQuestions = [
+const projectQuestions = [
   {
     type: 'confirm',
-    name: 'create',
-    message: chalk.red('The sftp configuration file is missing.') + ' Do you want to create it?',
+    name: 'project',
+    message: chalk.red('The project configuration file is missing') + ' Do you want to create it?',
+  },
+  {
+    type: 'input',
+    name: 'src',
+    message: 'Source folder: ',
+    default: './assets',
+    when: (answers) => answers.project,
+    validate: input => input !== ''
+  },
+  {
+    type: 'input',
+    name: 'build',
+    message: 'Build folder: ',
+    default: '../assets',
+    when: (answers) => answers.project,
+    validate: input => input !== ''
   },
   {
     type: 'input',
     name: 'host',
-    message: 'Host: ',
-    when: (answers) => answers.create,
+    message: 'SFTP Host: ',
+    when: (answers) => answers.project,
     validate: input => input !== ''
   },
   {
     type: 'input',
     name: 'username',
-    message: 'Username: ',
-    when: (answers) => answers.create,
+    message: 'SFTP Username: ',
+    when: (answers) => answers.project,
     validate: input => input !== ''
   },
   {
     type: 'input',
     name: 'password',
-    message: 'Password: ',
-    when: (answers) => answers.create,
+    message: 'SFTP Password: ',
+    when: (answers) => answers.project,
     validate: input => input !== ''
   },
   {
     type: 'input',
-    name: 'remote',
-    message: 'Remote Path: ',
-    when: (answers) => answers.create,
+    name: 'remotePath',
+    message: 'SFTP Remote Path: ',
+    when: (answers) => answers.project,
     validate: input => input !== ''
   },
   {
     type: 'input',
     name: 'port',
-    message: 'Port: ',
+    message: 'SFTP Port: ',
     default: '22',
-    when: (answers) => answers.create,
+    when: (answers) => answers.project,
   },
-]
+];
 
 // We set up the list of questions where we need answers for
 // in order to start the relevant script
@@ -82,7 +99,7 @@ const envQuestions = [
     type: 'confirm',
     name: 'upload',
     message: 'Automatically upload generated files to dev server?',
-    when: answers => answers.mode === DEV_ENV && fs.existsSync(sftpConfigFile)
+    when: answers => answers.mode === DEV_ENV && fs.existsSync(projectConfigFile)
   }
 
 ]
@@ -113,40 +130,106 @@ const handleEnvAnswers = function(answers) {
 
 };
 
-const handleSftpAnswers = function(answers) {
+function display( callback ) {
 
-  let { create, host, username, password, remotePath, port } = answers;
+  // First clear the console
+  clear()
+  
+  // Run figlet for styling purposes
+  // Figlet requires a callback to display our fancy title
+  // see https://www.npmjs.com/package/figlet
+  figlet( TITLE, function(err, data) {
 
-  if ( create ) {
-    let config = { host, username, password, remotePath, port };
-    let contents = 'module.exports = ' + util.inspect(config, false, null);
-    fs.writeFileSync(sftpConfigFile, contents);
-    console.log( chalk.green('\nThe sftp configuration file has now been created. \nYou can also edit it: ' + sftpConfigFile + '\n'));
-  } else {
-    console.log( chalk.yellow('\nThe sftp configuration file does not exist. Your files will not be uploaded to the dev server.\n') )
+    if (!err) {
+      // Displaying fancy title
+      console.log( chalk.yellow(data)  + '\n' )
+
+      callback();
+    }
+
+  });
+
+}
+
+function testConnection(host, username, password, port, callback) {
+
+  client.defaults({
+    port,
+    host,
+    username,
+    password
+  });
+
+  client.on('error', function(err) {
+    console.log( chalk.red('\nCould not connect to server.\n') )
+    console.log( '\n1) Please check your config file: ' + projectConfigFile )
+    console.log( '\n2) If you are behind a proxy, please check that npm is set up correctly: https://jjasonclark.com/how-to-setup-node-behind-web-proxy/' )
+    console.log( '\n3) If it is all fine, please check your internet connection')
+    console.log( '\n\n' )
+  });
+
+  client.sftp( function(err) {
+
+    if (!err) {
+      client.close();
+      callback();
+    }
+
+  });
+
+}
+
+const handleProjectAnswers = function(answers) {
+
+  let { project, src, build, host, username, password, remotePath, port } = answers;
+
+  if ( project ) {
+
+    testConnection( host, username, password, port, function() {
+
+      // Write the configuration in a file
+      let config = { src, build, host, username, password, remotePath, port };
+      let contents = 'module.exports = ' + util.inspect(config, false, null);
+      fs.writeFile(projectConfigFile, contents, function() {
+
+        // Inform user that the configuration has been successful
+        console.log('\nThe configuration file was successfully created: ' + projectConfigFile + '\n');
+
+        // Ask user if they want to run wepback now
+        console.log( (new inquirer.Separator()).line + '\n');
+        inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'start',
+            message: 'Would you like to run the script now?'
+          }
+        ]).then( function(answers) {
+
+          // If user asks to run the script
+          if (answers.start) {
+            display( () => inquirer.prompt(envQuestions).then(handleEnvAnswers) )
+          }
+
+        });
+
+      });
+
+    });
+
   }
-
-  console.log( '\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\n');
-
-  inquirer.prompt(envQuestions).then(handleEnvAnswers);
 
 };
 
-// First clear the console
-clear()
+display( function() {
 
-// Run figlet for styling purposes
-// Figlet requires a callback to display our fancy title
-// see https://www.npmjs.com/package/figlet
-figlet( TITLE, function(err, data) {
-
-  // Displaying fancy title
-  console.log( chalk.yellow(data)  + '\n' )
-
-  if ( !fs.existsSync(sftpConfigFile) ) {
-    inquirer.prompt(sftpQuestions).then(handleSftpAnswers);
+  if ( !fs.existsSync(projectConfigFile) ) {
+    inquirer.prompt(projectQuestions).then(handleProjectAnswers);
   } else {
-    inquirer.prompt(envQuestions).then(handleEnvAnswers);
+    let config = require('../config/project.js');
+    let { host, username, password, port } = config;
+    testConnection(host, username, password, port, function() {
+      inquirer.prompt(envQuestions).then(handleEnvAnswers);
+    });
   }
 
 });
