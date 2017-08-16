@@ -1,0 +1,18 @@
+{
+  "name": "environment-scripts",
+  "version": "1.0.0",
+  "description": "Set up environment o help automate work process",
+  "main": "index.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^2.1.0",
+    "clear": "0.0.1",
+    "figlet": "^1.2.0",
+    "inquirer": "^3.2.1",
+    "path": "^0.12.7"
+  }
+}
