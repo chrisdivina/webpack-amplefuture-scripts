@@ -29,7 +29,7 @@ const projectQuestions = [
   },
   {
     type: 'input',
-    name: 'src',
+    name: 'srcDirectory',
     message: 'Source folder: ',
     default: './assets',
     when: (answers) => answers.project,
@@ -37,7 +37,7 @@ const projectQuestions = [
   },
   {
     type: 'input',
-    name: 'build',
+    name: 'buildDirectory',
     message: 'Build folder: ',
     default: '../assets',
     when: (answers) => answers.project,
@@ -134,7 +134,7 @@ function display( callback ) {
 
   // First clear the console
   clear()
-  
+
   // Run figlet for styling purposes
   // Figlet requires a callback to display our fancy title
   // see https://www.npmjs.com/package/figlet
@@ -181,14 +181,14 @@ function testConnection(host, username, password, port, callback) {
 
 const handleProjectAnswers = function(answers) {
 
-  let { project, src, build, host, username, password, remotePath, port } = answers;
+  let { project, srcDirectory, buildDirectory, host, username, password, remotePath, port } = answers;
 
   if ( project ) {
 
     testConnection( host, username, password, port, function() {
 
       // Write the configuration in a file
-      let config = { src, build, host, username, password, remotePath, port };
+      let config = { srcDirectory, buildDirectory, host, username, password, remotePath, port };
       let contents = 'module.exports = ' + util.inspect(config, false, null);
       fs.writeFile(projectConfigFile, contents, function() {
 
