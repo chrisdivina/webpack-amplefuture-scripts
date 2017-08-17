@@ -1,10 +1,9 @@
 {
-  "name": "environment-scripts",
-  "version": "1.0.0",
+  "name": "webpack-amplefuture-scripts",
+  "version": "0.0.1",
   "description": "Set up environment to help automate work process",
-  "main": "index.js",
-  "scripts": {
-    "start": "node scripts/start.js"
+  "bin": {
+    "webpack-amplefuture-scripts": "./bin/start.js"
   },
   "author": "",
   "license": "ISC",
@@ -30,5 +29,14 @@
     "scp2": "^0.5.0",
     "style-loader": "^0.18.2",
     "webpack": "^3.5.4"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrisdivina/webpack-amplefuture-scripts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chrisdivina/webpack-amplefuture-scripts/issues"
+  },
+  "homepage": "https://github.com/chrisdivina/webpack-amplefuture-scripts#readme"
 }
