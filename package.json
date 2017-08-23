@@ -2,9 +2,6 @@
   "name": "webpack-amplefuture-scripts",
   "version": "0.0.3",
   "description": "Set up environment to help automate work process",
-  "scripts": {
-    "postinstall": "npm link"
-  },
   "bin": {
     "webpack-amplefuture-scripts": "./index.js",
     "create-amplefuture-project": "./bin/create.js"
