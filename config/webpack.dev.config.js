@@ -7,12 +7,15 @@ const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const eslintFormatter = require('react-dev-utils/eslintFormatter');
 const ProgressBarPlugin = require('progress-bar-webpack-plugin');
 const chalk = require('chalk');
-const paths = require('./paths');
-const config = require('./project');
-// const FilterEmitOutputPlugin = require('../plugins/FilterEmitOutputPlugin');
-// const SftpOutputPlugin = require('../plugins/SftpOutputPlugin');
+const Project = require('./utils/Project');
+const FilterOutputPlugin = require('./plugins/FilterOutputPlugin');
+const SftpOutputPlugin = require('./plugins/SftpOutputPlugin');
+const HandleErrorsPlugin = require('./plugins/HandleErrorsPlugin')
+const notifier = require('node-notifier');
 
-
+// We create an object with the set up for the project
+// This prevent us from reading the same files several times
+const project = new Project();
 
 // We set up the webpack plugins here
 // because we may or may not add additional plugins
@@ -23,49 +26,62 @@ let plugins = [
     filename: '[name].css'
   }),
 
-  // This plugin is needed in our current setup
-  // Instead of adding the entries manually (see options.entry)
-  // We automatically select them.
-  // new CssEntryPlugin({
-  //   filename: './js/tmp.js',
-  //   output: 'js/tmp'
-  // }),
-  // new FilterEmitOutputPlugin(paths.outputs),
-  //
+  new FilterOutputPlugin(project.whitelist),
 
   new ProgressBarPlugin({
-    format: chalk.cyan('Compiling') + ' :bar' + chalk.green(' :percent') + ' :msg',
+    format: chalk.cyanBright('  Compiling') + ' :bar' + chalk.greenBright(' :percent') + ' :msg',
     clear: false,
     incomplete: chalk.dim('\u2588'),
-    complete: chalk.green('\u2588')
+    complete: chalk.greenBright('\u2588'),
+    summary: false,
+    customSummary: function() {
+      console.log(chalk.greenBright('  Build successful. Now waiting for file changes...'));
+      if (process.env.AMPLEFUTURE_UPLOAD === 'false') {
+        console.log(chalk.gray('  Please note that the generated assets have not been uploaded'));
+      }
+      console.log(chalk.gray('  (Ctrl+C to exit the script)'))
+      notifier.notify({
+        'title': 'Webpack is ready',
+        'message': 'You can now start editing your code'
+      });
+    }
   }),
+
+  new HandleErrorsPlugin()
+
 
 ]
 
-const { uploadAllowed = true } = config;
-if (uploadAllowed) {
-  // pluging.push( new SftpOutputPlugin({
-  //   host: config.host,
-  //   username: config.username,
-  //   password: config.password,
-  //   remotePath: path.join(config.remotePath, './assets') // TODO: find a way to not use direct input here
-  //   localPath: paths.resolve(config.srcDirectory)
-  // }));
+if (process.env.AMPLEFUTURE_UPLOAD === 'true') {
+  const { config } = project;
+  if (config) {
+    plugins.push( new SftpOutputPlugin({
+      host: config.host,
+      username: config.username,
+      password: config.password,
+      remotePath: path.join(config.remotePath, config.remoteFolder),
+      localPath: project.paths.build
+    }));
+  }
 }
+
+//console.log(project.entries);
 
 // This is the devlopement configuration.
 // It compiles faster but does not produce a minimal bundle.
 // The production configuration is different and lives in a separate file.
 module.exports = {
+
   // We do not generate source maps in development mode
   // The code source is not minified
   devtool: false,
+
   // We load the files to be watched
-  entry: paths.getEntries( paths.resolve(config.srcDirectory), paths.resolve(config.buildDirectory) ),
+  entry: project.entries,
 
   output: {
     // The build folder.
-    path: paths.resolve(config.buildDirectory),
+    path: project.paths.build,
     // Generated JS file names (with nested folders).
     // There will be one js file per entry
     filename: '[name].js',
@@ -86,6 +102,7 @@ module.exports = {
       // It's important to do this before Babel processes the JS.
       {
         test: /\.(js|jsx)$/,
+        include: path.join(project.paths.src,  './js'),
         enforce: 'pre',
         use: [
           {
@@ -103,14 +120,13 @@ module.exports = {
             },
             loader: require.resolve('eslint-loader'),
           },
-        ],
-        include: paths.resolve('./js'),
+        ]
       },
       // Process JS with Babel.
       {
         test: /\.(js|jsx)$/,
-        include: paths.resolve('./js'),
         loader: require.resolve('babel-loader'),
+        include: path.join(project.paths.src,  './js'),
         // @remove-on-eject-begin
         options: {
           babelrc: false,
@@ -131,8 +147,8 @@ module.exports = {
       // use the "style" loader inside the async code so CSS from them won't be
       // in the main CSS file.
       {
-        test: /\.css$/,
-        include: paths.resolve('./styles'),
+        test: /\.(css|scss|sass)$/,
+        include: path.join(project.paths.src,  './styles'),
         loader: ExtractTextPlugin.extract(
           Object.assign(
             {
@@ -144,48 +160,6 @@ module.exports = {
                     importLoaders: 1,
                     modules: true,
                     localIdentName: '[name]',
-                    sourceMap: false,
-                    minimize: false
-                  },
-                },
-                {
-                  loader: require.resolve('postcss-loader'),
-                  options: {
-                    sourceMap: false,
-                    ident: 'postcss', // https://webpack.js.org/guides/migrating/#complex-options
-                    plugins: () => [
-                      require('postcss-flexbugs-fixes'),
-                      autoprefixer({
-                        browsers: [
-                          '>1%',
-                          'last 4 versions',
-                          'Firefox ESR',
-                          'not ie < 9', // React doesn't support IE8 anyway
-                        ],
-                        flexbox: 'no-2009',
-                      }),
-                    ],
-                  },
-                }
-              ],
-            }
-          )
-        ),
-      },
-      {
-        test: /\.(scss|sass)$/,
-        include: paths.resolve('./styles'),
-        loader: ExtractTextPlugin.extract(
-          Object.assign(
-            {
-              fallback: require.resolve('style-loader'),
-              use: [
-                {
-                  loader: require.resolve('css-loader'),
-                  options: {
-                    importLoaders: 1,
-                    modules: true,
-                    localIdentName: '[path][name]__[local]--[hash:base64:5]',
                     sourceMap: false,
                     minimize: false
                   },
@@ -220,8 +194,6 @@ module.exports = {
           )
         ),
       },
-      // ** STOP ** Are you adding a new loader?
-      // Remember to add the new extension(s) to the "file" loader exclusion list.
     ],
   },
   plugins,

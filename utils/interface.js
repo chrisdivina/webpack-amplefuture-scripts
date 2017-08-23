@@ -3,43 +3,13 @@ const isInteractive = process.stdout.isTTY;
 const notifier = require('node-notifier');
 const chalk = require('chalk');
 const clearConsole = require('react-dev-utils/clearConsole');
-
-const askToBuildForProduction = function() {
-
-  const handle = function(answers) {
-
-    if ( 'Yes' === answers.rebuild ) {
-      require('../scripts/build-prod');
-    } else {
-      process.exit(0);
-    }
-
-  }
-
-  const questions = [
-    {
-      type: 'list',
-      name: 'rebuild',
-      message: 'Would you like to create a build for production before leaving?',
-      choices: [
-        new inquirer.Separator(),
-        'Yes',
-        'No'
-      ]
-    }
-  ];
-
-  clear();
-  inquirer.prompt(questions, handle);
-
-}
+const figlet = require('figlet');
 
 const notifyWebpackReady = function() {
   notifier.notify({
     'title': 'Webpack is ready',
     'message': 'You can now start editing your code'
   });
-  console.log(chalk.cyan('Webpack is now watching for file changes...\n'));
 }
 
 const notifyWebpackDone = function() {
@@ -55,9 +25,27 @@ const clear = function() {
   }
 }
 
+const display = function( callback ) {
+
+  // First clear the console
+  clearConsole()
+
+  // Run figlet for styling purposes
+  // Figlet requires a callback to display our fancy title
+  // see https://www.npmjs.com/package/figlet
+  figlet( 'Amplefuture', function(err, data) {
+    if (!err) {
+      // Displaying fancy title
+      console.log( chalk.yellow(data)  + '\n' )
+      callback();
+    }
+  });
+
+}
+
 module.exports = {
-  askToBuildForProduction,
   notifyWebpackReady,
   notifyWebpackDone,
-  clearConsole: clear
+  clearConsole: clear,
+  display
 }
