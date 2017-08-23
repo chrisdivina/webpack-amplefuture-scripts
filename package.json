@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "Set up environment to help automate work process",
   "bin": {
-    "webpack-amplefuture-scripts": "./index.js"
+    "webpack-amplefuture-scripts": "./index.js",
+    "create-amplefuture-project": "./bin/create.js"
   },
   "author": "",
   "license": "ISC",
