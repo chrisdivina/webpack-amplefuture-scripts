@@ -1,10 +1,10 @@
-const scp2 = require('scp2');
+const client = require('scp2');
 const path = require('path');
 const chalk = require('chalk');
 
 function SftpOutputPlugin(options) {
   this.startTime = Date.now();
-  this.prevTimestamps = {};
+  this.chunkVersions = {};
   this.host = options.host;
   this.username = options.username;
   this.password = options.password;
@@ -24,9 +24,10 @@ SftpOutputPlugin.prototype.upload = function(filenames, index, callback) {
   let that = this;
   const { localPath, remotePath } = that;
   let localFilePath = filenames[index];
-  let remoteFilePath = path.join(that.remotePath, filename.replace(that.localPath, ''));
-  console.log(localFilePath, remoteFilePath)
-  scp2.upload(localFilePath, remoteFilePath, function(err) {
+  let remoteFilePath = path.join(that.remotePath, localFilePath.replace(that.localPath, ''));
+  let sftpConfig = that.username + ':' + that.password + '@' + that.host + ':' + remoteFilePath;
+
+  client.scp(localFilePath, sftpConfig, function(err) {
 
       if (err) {
         console.log(chalk.red('\nCould not upload file: %s'), localFilePath );
@@ -37,7 +38,7 @@ SftpOutputPlugin.prototype.upload = function(filenames, index, callback) {
         if ( filenames[index + 1] ) {
           that.upload(filenames, index + 1, callback);
         } else {
-          scp2.close();
+          client.close();
           callback(); // Continue compilation
         }
 
@@ -49,35 +50,37 @@ SftpOutputPlugin.prototype.upload = function(filenames, index, callback) {
 
 SftpOutputPlugin.prototype.handleEmit = function(compilation, callback) {
 
-    if (this.uploadOnFirstBuild) {
-        var changedFiles = Object.keys(compilation.assets).map( asset => path.join(this.localPath, asset) );
-        this.upload(changedFiles, 0, callback)
-    }
+  let that = this;
+  let changedAssets = [];
 
-    var changedFiles = Object.keys(compilation.fileTimestamps).filter(function(watchfile) {
-      return (this.prevTimestamps[watchfile] || this.startTime) < (compilation.fileTimestamps[watchfile] || Infinity);
-    }.bind(this));
+  var changedChunks = compilation.chunks.filter(function(chunk) {
+      var oldVersion = this.chunkVersions[chunk.name];
+      this.chunkVersions[chunk.name] = chunk.hash;
+      return chunk.hash !== oldVersion;
+    }.bind(this))
+    .forEach( chunk => changedAssets = changedAssets.concat(chunk.files) );
 
-    this.prevTimestamps = compilation.fileTimestamps;
+    // Create absolute paths
+    let emittedAssets = Object.keys(compilation.assets);
 
-    if (changedFiles.length > 0) {
-      this.upload(changedFiles, 0, callback)
-    } else {
-      callback()
-    }
+    // Make sure the changed assets were actually emitted
+    // And return their absolutepath
+    changedAssets = changedAssets
+    .filter( asset => emittedAssets.indexOf(asset) > -1 )
+    .map( asset => path.join(that.localPath, asset) );
+
+  if (changedAssets.length > 0) {
+    this.upload(changedAssets, 0, callback)
+  } else {
+    callback()
+  }
+
 }
 
 SftpOutputPlugin.prototype.apply = function (compiler) {
 
-  let that = this;
-
-  // Initialise sftp config
-  const { host, username, password, port } = that;
-  const options = {host, username, password, port};
-  scp2.defaults(options);
-
   // Handle compiler `emit` event
-  compiler.plugin('emit', that.handleEmit);
+  compiler.plugin('after-emit', this.handleEmit.bind(this));
 
 }
 

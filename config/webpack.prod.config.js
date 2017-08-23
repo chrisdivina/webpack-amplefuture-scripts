@@ -80,7 +80,6 @@ let plugins = [
 ]
 
 // Only upload if the environment is set to do so
-console.log(process.env.AMPLEFUTURE_UPLOAD)
 if (process.env.AMPLEFUTURE_UPLOAD === 'true') {
   const { config } = project;
   if (config) {
@@ -89,7 +88,9 @@ if (process.env.AMPLEFUTURE_UPLOAD === 'true') {
       username: config.username,
       password: config.password,
       remotePath: path.join(config.remotePath, config.remoteFolder),
-      localPath: project.paths.build
+      localPath: project.paths.build,
+      uploadOnFirstBuild: true,
+
     }));
   }
 }
