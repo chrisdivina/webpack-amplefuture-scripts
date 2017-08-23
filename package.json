@@ -1,6 +1,6 @@
 {
   "name": "webpack-amplefuture-scripts",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Set up environment to help automate work process",
   "bin": {
     "webpack-amplefuture-scripts": "./index.js",
