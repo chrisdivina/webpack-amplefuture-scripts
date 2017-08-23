@@ -1,0 +1,4 @@
+node_modules
+config/sftp.js
+config/options.js
+config/project.js 

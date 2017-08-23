@@ -21,6 +21,12 @@ var pe = new PrettyError();
 const project = new Project();
 const { config } = project;
 
+// Bail out if there are not entries to watched
+if (Object.keys(project.entries).length === 0 && project.entries.constructor === Object) {
+  console.log( chalk.yellowBright('\n  No files to watch. Exiting the script...'));
+  process.exit(0);
+}
+
 // We set up the webpack plugins here
 // because we may or may not add additional plugins
 // depending on the project config
@@ -74,7 +80,8 @@ let plugins = [
 ]
 
 // Only upload if the environment is set to do so
-if (process.env.AMPLEFUTURE_UPLOAD) {
+console.log(process.env.AMPLEFUTURE_UPLOAD)
+if (process.env.AMPLEFUTURE_UPLOAD === 'true') {
   const { config } = project;
   if (config) {
     plugins.push( new SftpOutputPlugin({

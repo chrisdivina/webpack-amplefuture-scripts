@@ -28,7 +28,6 @@ HandleErrorsPlugin.prototype.apply = function(compiler) {
         // we only display the very first error only to make it more readable
         var renderedError = pe.render(new Error(compilation.errors[0]));
         console.log(renderedError);
-
         process.exit(0);
       });
 

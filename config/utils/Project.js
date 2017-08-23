@@ -1,5 +1,6 @@
 const path = require('path')
 const fs = require('fs')
+const chalk = require('chalk');
 
 const CONFIG_FILE = 'project.config.json';
 const ROOT = process.cwd()
@@ -89,7 +90,14 @@ Project.prototype.setIO = function() {
 // // @param dir
 // // @return array
 function walkDirectory(dir) {
+
     var results = [];
+
+    if ( !fs.existsSync(dir) ) {
+      console.log( chalk.redBright('  The following folder does not exists: ') + dir + ('\n') );
+      process.exit(1);
+    }
+
     var list = fs.readdirSync(dir);
     list.forEach(function(file) {
         file = dir + '/' + file
@@ -97,6 +105,7 @@ function walkDirectory(dir) {
         if (stat && stat.isDirectory()) results = results.concat(walkDirectory(file))
         else results.push(file)
     })
+
     return results
 };
 

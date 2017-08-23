@@ -25,7 +25,7 @@ SftpOutputPlugin.prototype.upload = function(filenames, index, callback) {
   const { localPath, remotePath } = that;
   let localFilePath = filenames[index];
   let remoteFilePath = path.join(that.remotePath, filename.replace(that.localPath, ''));
-
+  console.log(localFilePath, remoteFilePath)
   scp2.upload(localFilePath, remoteFilePath, function(err) {
 
       if (err) {

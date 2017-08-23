@@ -17,6 +17,12 @@ const notifier = require('node-notifier');
 // This prevent us from reading the same files several times
 const project = new Project();
 
+// Bail out if there are not entries to watched
+if (Object.keys(project.entries).length === 0 && project.entries.constructor === Object) {
+  console.log( chalk.yellowBright('\n  No files to watch. Exiting the script...'));
+  process.exit(0);
+}
+
 // We set up the webpack plugins here
 // because we may or may not add additional plugins
 // depending on the project config

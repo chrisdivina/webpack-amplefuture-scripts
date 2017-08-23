@@ -2,29 +2,30 @@
 'use strict';
 const fs = require('fs')
 const path = require('path')
-const paths = require('../utils/paths')
-const ui = require('../utils/interface')
+const { display } = require('../utils/interface')
 const chalk = require('chalk')
-const Connection = require('../utils/connection')
+const sftp = require('../utils/sftp')
 const inquirer = require('inquirer')
 const pd = require('pretty-data').pd;
+const PrettyError = require('pretty-error');
+const pe = new PrettyError();
 const { spawn  } = require('child_process');
 
 // We set up some constants
-const PROJECT_DIR = paths.projectDirectory
-const CONFIG_FILENAME = 'project.config.json';
-const CONFIG_ABS_PATH = path.join( PROJECT_DIR, CONFIG_FILENAME)
+const CONFIG_FILE = 'project.config.json';
+const PROJECT_DIR = process.cwd()
+const CONFIG_ABS_PATH = path.join( PROJECT_DIR, CONFIG_FILE)
 const PACKAGE_JSON_ABS_PATH = path.join( PROJECT_DIR, 'package.json')
 
-// We display the initial screen
-ui.display(prompt);
 
-function prompt() {
+display( function() {
 
   let confirmMessage = chalk.red('It seems like a project config has already been set up.') +  ' Are you sure you want to continue anyway?';
+  const configExists = fs.existsSync(CONFIG_ABS_PATH) && fs.existsSync(PACKAGE_JSON_ABS_PATH);
+  const configMissing = !fs.existsSync(CONFIG_ABS_PATH) || !fs.existsSync(PACKAGE_JSON_ABS_PATH);
 
-  // This is the list of questions that we ask the user about the project
-  const questions = [
+  // Prompt the questions
+  inquirer.prompt([
     {
       // If the project is already set up, we get confirmation from the user that
       // they want to overwrite the current config
@@ -35,38 +36,38 @@ function prompt() {
     },
     {
       type: 'input',
-      name: 'srcDirectory',
-      message: 'Source folder: ',
+      name: 'assetsDir',
+      message: 'Assets folder: ',
       default: 'assets',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
       validate: input => input !== ''
     },
     {
       type: 'input',
       name: 'host',
       message: 'SFTP Host: ',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
       validate: input => input !== ''
     },
     {
       type: 'input',
       name: 'username',
       message: 'SFTP Username: ',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
       validate: input => input !== ''
     },
     {
       type: 'input',
       name: 'password',
       message: 'SFTP Password: ',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
       validate: input => input !== ''
     },
     {
       type: 'input',
       name: 'remotePath',
       message: 'SFTP Remote Path: ',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
       validate: input => input !== ''
     },
     {
@@ -74,40 +75,59 @@ function prompt() {
       name: 'port',
       message: 'SFTP Port: ',
       default: '22',
-      when: answers => answers.continue,
+      when: answers => answers.continue || configMissing,
     },
-  ];
-
-  // We handle the answers here
-  // We make sure that the connection
-  function handleAnswers(answers) {
+  ]).then(function(answers) {
 
     // Exit script if asked by user
-    if (!answers.continue) {
+    if (!answers.continue && configExists) {
       process.exit(0);
     }
 
     // Remove the continue property as it's not needed anymore
     delete answers.continue;
-    let { srcDirectory, host, username, password, remotePath, port } = answers;
+    let { assetsDir, host, username, password, remotePath, port } = answers;
 
-    // Create a new connection object
-    let conn = new Connection(host, username, password, port);
+    console.log( '\n\n  Testing server connection...' )
 
     // We test the connection
-    conn.test( function() {
+    sftp.test(host, username, password, port, function(err) {
+
+      if (err) {
+        console.log(pe.render(new Error(err)))
+        process.exit(1);
+      }
+
+      console.log( chalk.greenBright('  Connection was successful.\n') )
+
+      const config = {
+        host,
+        username,
+        password,
+        remotePath,
+        port,
+        remoteFolder: assetsDir,
+        src: path.join( './', assetsDir),
+        build: path.join('../', assetsDir)
+      }
       // If successful
-      createConfigFile(answers, updatePackageJson);
+      createConfigFile(config, function() {
+        if ( fs.existsSync( PACKAGE_JSON_ABS_PATH) ) {
+          // If the file exists, we read it first
+          // And then we call updateContent(err, data)
+          fs.readFile(PACKAGE_JSON_ABS_PATH, 'utf8', updatePackageJson);
+        } else {
+          // We don't need to read it, and can create a new one
+          // We can call update content without params
+          // The params will be initialised by the function itself
+          createPackageJson();
+        }
+      });
     });
 
-  };
+  });
 
-  // Prompt the questions
-  inquirer.prompt(questions).then(handleAnswers);
-
-}
-
-
+})
 
 function createConfigFile(config, callback) {
 
@@ -118,7 +138,7 @@ function createConfigFile(config, callback) {
 
 }
 
-function updateContent(err = null, data = "") {
+function updatePackageJson(err = null, data = "") {
 
   // Parse the json string
   // If the string is empty, it will return an empty object
@@ -140,16 +160,34 @@ function updateContent(err = null, data = "") {
 
   // Write the new json in package.json
   // And start installing packages
-  fs.writeFile(PACKAGE_JSON_ABS_PATH, content, function() {
-    ui.display(installPackages);
-  });
+  fs.writeFile(PACKAGE_JSON_ABS_PATH, content, installPackages);
+
+}
+
+function createPackageJson() {
+
+  let config = {}
+  let scripts = {}
+
+  // We add the start script
+  scripts.start = "webpack-amplefuture-scripts";
+
+  // update the scripts in the config
+  config.scripts = scripts;
+
+  // Prettify the json string
+  let content = pd.json(config);
+
+  // Write the new json in package.json
+  // And start installing packages
+  fs.writeFile(PACKAGE_JSON_ABS_PATH, content, installPackages);
 
 }
 
 function installPackages() {
 
-  console.log('\nSetting up the project...');
-  console.log('(This might take a while so you might want to grab a cuppa...)\n');
+  console.log('\n  Setting up the project...');
+  console.log( chalk.gray('  (This might take a while so you might want to grab a cuppa...)\n'));
 
   let command = /^win/.test(process.platform) ? 'npm.cmd' : 'npm';
 
@@ -168,30 +206,15 @@ function installPackages() {
 
   child.on('exit', function (code) {
     if ( code === 0 ) {
-      ui.display(endCreation);
+      display(endCreation);
     }
   });
 
 }
 
 function endCreation() {
-  console.log( chalk.green('\nAlright, the project is all set up for you!\n'));
-  console.log( 'Please run ' + chalk.inverse(' npm start ') + ' and enjoy the ride.\n');
-  process.exit(0)
-}
-
-// This update the package Json file
-function updatePackageJson() {
-
-  if ( fs.existsSync( PACKAGE_JSON_ABS_PATH) ) {
-    // If the file exists, we read it first
-    // And then we call updateContent(err, data)
-    fs.readFile(PACKAGE_JSON_ABS_PATH, 'utf8', updateContent);
-  } else {
-    // We don't need to read it, and can create a new one
-    // We can call update content without params
-    // The params will be initialised by the function itself
-    updateContent();
-  }
-
+  console.log(chalk.greenBright('  Congratulations!'));
+  console.log('  The project is now set up for you.')
+  console.log( '\n  Please run ' + chalk.cyanBright.inverse(' npm start ') + ' to run webpack');
+  process.exit(0);
 }
