@@ -1,6 +1,6 @@
 {
   "name": "webpack-amplefuture-scripts",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Set up environment to help automate work process",
   "scripts": {
     "postinstall": "npm link"
