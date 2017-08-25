@@ -12,6 +12,8 @@ const FilterOutputPlugin = require('./plugins/FilterOutputPlugin');
 const SftpOutputPlugin = require('./plugins/SftpOutputPlugin');
 const HandleErrorsPlugin = require('./plugins/HandleErrorsPlugin')
 const notifier = require('node-notifier');
+const postcssImport = require('postcss-import');
+const smartImport = require("postcss-smart-import")
 
 // We create an object with the set up for the project
 // This prevent us from reading the same files several times
@@ -47,8 +49,8 @@ let plugins = [
       }
       console.log(chalk.gray('  (Ctrl+C to exit the script)'))
       notifier.notify({
-        'title': 'Webpack is ready',
-        'message': 'You can now start editing your code'
+        'title': 'Please refresh your browser',
+        'message': 'The assets have now been generated'
       });
     }
   }),
@@ -88,6 +90,7 @@ module.exports = {
   output: {
     // The build folder.
     path: project.paths.build,
+    publicPath: '/assets/',
     // Generated JS file names (with nested folders).
     // There will be one js file per entry
     filename: '[name].js',
@@ -153,7 +156,7 @@ module.exports = {
       // use the "style" loader inside the async code so CSS from them won't be
       // in the main CSS file.
       {
-        test: /\.(css|scss|sass)$/,
+        test: /\.css$/,
         include: path.join(project.paths.src,  './styles'),
         loader: ExtractTextPlugin.extract(
           Object.assign(
@@ -165,7 +168,7 @@ module.exports = {
                   options: {
                     importLoaders: 1,
                     modules: true,
-                    localIdentName: '[name]',
+                    localIdentName: '[local]',
                     sourceMap: false,
                     minimize: false
                   },
@@ -176,6 +179,7 @@ module.exports = {
                     sourceMap: false,
                     ident: 'postcss', // https://webpack.js.org/guides/migrating/#complex-options
                     plugins: () => [
+                      smartImport(),
                       require('postcss-flexbugs-fixes'),
                       autoprefixer({
                         browsers: [
@@ -185,14 +189,55 @@ module.exports = {
                           'not ie < 9', // React doesn't support IE8 anyway
                         ],
                         flexbox: 'no-2009',
-                      }),
+                      })
+                    ],
+                  },
+                }
+              ],
+            }
+          )
+        ),
+      },
+      {
+        test: /\.(scss|sass)$/,
+        include: path.join(project.paths.src,  './styles'),
+        loader: ExtractTextPlugin.extract(
+          Object.assign(
+            {
+              fallback: require.resolve('style-loader'),
+              use: [
+                {
+                  loader: require.resolve('css-loader'),
+                  options: {
+                    importLoaders: 1,
+                    localIdentName: '[local]',
+                    sourceMap: false,
+                    minimize: false
+                  },
+                },
+                {
+                  loader: require.resolve('postcss-loader'),
+                  options: {
+                    sourceMap: false,
+                    ident: 'postcss', // https://webpack.js.org/guides/migrating/#complex-options
+                    plugins: (ctx) => [
+                      require('postcss-flexbugs-fixes'),
+                      autoprefixer({
+                        browsers: [
+                          '>1%',
+                          'last 4 versions',
+                          'Firefox ESR',
+                          'not ie < 9', // React doesn't support IE8 anyway
+                        ],
+                        flexbox: 'no-2009',
+                      })
                     ],
                   },
                 },
                 {
                   loader: require.resolve('sass-loader'),
                   options: {
-                    sourceMap: false
+                    sourceMap: false,
                   }
                 }
               ],

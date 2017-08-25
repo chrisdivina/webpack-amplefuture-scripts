@@ -187,7 +187,7 @@ module.exports = {
                   options: {
                     importLoaders: 1,
                     modules: true,
-                    localIdentName: '[name]',
+                    localIdentName: '[local]',
                     sourceMap: true,
                     minimize: true
                   },
